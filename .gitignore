@@ -1,0 +1,4 @@
+/myenv
+/.venv
+.env
+*_old.py
