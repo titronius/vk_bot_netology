@@ -1,10 +1,9 @@
 -- Создание базы данных
 CREATE DATABASE vkinder_db;
 
-
--- Создание таблицы users
-CREATE TABLE users (
-    user_id SERIAL PRIMARY KEY,
+-- Создание таблицы user
+CREATE TABLE "user" (
+    id SERIAL PRIMARY KEY,
     vk_id INTEGER NOT NULL UNIQUE,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
@@ -15,25 +14,34 @@ CREATE TABLE users (
     bdate DATE,
     relation VARCHAR(50),
     smoking VARCHAR(50),
-    alcohol VARCHAR(50)
+    alcohol VARCHAR(50),
+    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Создание таблицы photos
-CREATE TABLE photos (
-    photo_id SERIAL PRIMARY KEY,
-    vk_id INTEGER NOT NULL,
-    photo_url TEXT,
-    likes INTEGER,
-    FOREIGN KEY (vk_id) REFERENCES users (vk_id) ON DELETE CASCADE
-);
-
--- Создание таблицы relationships
-CREATE TABLE relationships (
+-- Создание таблицы photo
+CREATE TABLE photo (
     id SERIAL PRIMARY KEY,
-    user_vk_id INTEGER NOT NULL,
-    related_vk_id INTEGER NOT NULL,
-    status VARCHAR(10) NOT NULL CHECK (status IN ('favorite', 'blacklisted')),
+    user_id INTEGER NOT NULL,
+    photo_url TEXT,
+    photo_vk_id INT,
+    likes INTEGER,
+    FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE
+);
+
+-- Создание таблицы relationship_status
+CREATE TABLE relationship_status (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+-- Создание таблицы relationship
+CREATE TABLE relationship (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    related_id INTEGER NOT NULL,
+    status_id INTEGER NOT NULL,
     date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE,
-    FOREIGN KEY (related_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE,
+    FOREIGN KEY (related_id) REFERENCES "user" (id) ON DELETE CASCADE,
+    FOREIGN KEY (status_id) REFERENCES relationship_status (id) ON DELETE CASCADE
 );
