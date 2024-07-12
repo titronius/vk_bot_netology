@@ -1,3 +1,4 @@
+from datetime import datetime
 from pprint import pprint
 from sqlalchemy import create_engine, Column, Integer, String, Date, SmallInteger, ForeignKey, UniqueConstraint, TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
@@ -126,8 +127,64 @@ class VKSession:
         }
         print(search_params)
         users_found = self.vk.users.search(**search_params)['items']
-        user_ids = [user for user in users_found]
+        user_ids = [user['id'] for user in users_found]
         return user_ids
+    
+
+    def get_users_db_data(self, params):
+        """
+        Получение данных пользователей VK в формате для базы данных.
+
+        Args:
+            params (dict): Словарь с параметрами поиска:
+                - sex (int): Пол (1 — женщина, 2 — мужчина, 0 — любой).
+                - city (str): Название города.
+                - relation (int): Семейное положение пользователя.
+                - smoking (int): Отношение к курению (1 — да, 2 — время от времени, 3 — нет).
+                - alcohol (int): Отношение к алкоголю (1 — регулярно, 2 — иногда, 3 — никогда).
+
+        Returns:
+            list: Список словарей с данными пользователей для базы данных.
+        """
+        # Получаем список ID пользователей, удовлетворяющих параметрам поиска
+        user_ids = self.search_users(params)[:10]
+
+        # Подготовим список для хранения данных пользователей для базы данных
+        users_db_data = []
+
+        for user_id in user_ids:
+            # Получаем подробную информацию о пользователе
+            user_info = self.get_user_info(user_id)
+
+            # Проверяем корректность поля bdate
+            bdate_str = user_info.get('bdate', '01.01.1900')
+            if bdate_str == '01.01.1900':
+                bdate_parsed = datetime.strptime(bdate_str, '%d.%m.%Y').date()
+            else:
+                try:
+                    if '.' in bdate_str:
+                        bdate_parsed = datetime.strptime(bdate_str, '%d.%m.%Y').date()
+                    else:
+                        bdate_parsed = datetime.strptime(bdate_str, '%d.%m').date()
+                except (ValueError, TypeError):
+                    bdate_parsed = datetime.strptime('01.01.1900', '%d.%m.%Y').date()
+
+            # Формируем словарь с данными пользователя для базы данных
+            user_dict = {
+                'id': user_info['id'],
+                'first_name': user_info['first_name'],
+                'last_name': user_info['last_name'],
+                'bdate': bdate_parsed,
+                'sex': user_info.get('sex', None),
+                'city': user_info.get('city', {}).get('title', ''),
+                'relation': user_info.get('relation', None),
+                'smoking': params.get('smoking', None),
+                'alcohol': params.get('alcohol', None)
+            }
+
+            users_db_data.append(user_dict)
+
+        return users_db_data
 
 
 class User:
@@ -195,3 +252,12 @@ if __name__ == "__main__":
     user_ids = vk_user_session.search_users(search_params)
     print(f"Найдено пользователей: {len(user_ids)}")
     pprint(f"ID пользователей: {user_ids}")
+
+    # Предположим, что у вас уже есть экземпляр класса VKSession и загружены параметры поиска search_params
+
+    # Получаем данные пользователей VK в формате для базы данных
+    users_db_data = vk_user_session.get_users_db_data(search_params)
+
+    # Выводим информацию о найденных пользователях
+    for user_data in users_db_data:
+        print(user_data)
