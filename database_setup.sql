@@ -11,7 +11,11 @@ CREATE TABLE users (
     profile_url TEXT,
     city VARCHAR(50),
     age INTEGER,
-    gender CHAR(1)
+    gender CHAR(1),
+    bdate DATE,
+    relation VARCHAR(50),
+    smoking VARCHAR(50),
+    alcohol VARCHAR(50)
 );
 
 -- Создание таблицы photos
@@ -23,20 +27,13 @@ CREATE TABLE photos (
     FOREIGN KEY (vk_id) REFERENCES users (vk_id) ON DELETE CASCADE
 );
 
--- Создание таблицы favorites
-CREATE TABLE favorites (
+-- Создание таблицы relationships
+CREATE TABLE relationships (
     id SERIAL PRIMARY KEY,
     user_vk_id INTEGER NOT NULL,
-    favorite_vk_id INTEGER NOT NULL,
+    related_vk_id INTEGER NOT NULL,
+    status VARCHAR(10) NOT NULL CHECK (status IN ('favorite', 'blacklisted')),
+    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE,
-    FOREIGN KEY (favorite_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE
-);
-
--- Создание таблицы blacklist
-CREATE TABLE blacklist (
-    id SERIAL PRIMARY KEY,
-    user_vk_id INTEGER NOT NULL,
-    blocked_vk_id INTEGER NOT NULL,
-    FOREIGN KEY (user_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE,
-    FOREIGN KEY (blocked_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE
+    FOREIGN KEY (related_vk_id) REFERENCES users (vk_id) ON DELETE CASCADE
 );
