@@ -1,4 +1,6 @@
-bot_token = 'token'
+bot_token = ''
+DSN = ""
+
 
 greeting_msg = """
 Доброго дня суток!

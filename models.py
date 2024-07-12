@@ -1,3 +1,5 @@
+import sqlalchemy as sq
+import settings
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, TIMESTAMP, Date, CHAR
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -53,6 +55,34 @@ class Relationship(Base):
     user = relationship("User", foreign_keys=[user_id], back_populates="relationships")
     related_user = relationship("User", foreign_keys=[related_id], back_populates="related_relationships")
     status = relationship("RelationshipStatus", back_populates="relationships")
+
+class BdInstruments():
+    engine = sq.create_engine(settings.DSN, pool_size=40, max_overflow=0)
+    def get_session():
+        Session = sessionmaker(bind=BdInstruments.engine)
+        session = Session()
+        return session
+    
+    def create_tables():
+        Base.metadata.create_all(BdInstruments.engine)
+
+    def drop_tables():
+        Base.metadata.drop_all(BdInstruments.engine)
+
+    # def data_add():
+    #     session = BdInstruments.get_session()
+    #     with open('/var/bots/education_en_ru_bot/data_for_bd/data.json', 'r') as fd:
+    #         data = json.load(fd)
+
+    #     for record in data:
+    #         model = {
+    #             'vocabulary': Vocabulary,
+    #             'category_name': CategoryName,
+    #             'status_name': StatusName
+    #         }[record.get('model')]
+    #         session.add(model(**record.get('fields')))
+    #     session.commit()
+
 
 # Подключение к базе данных
 engine = create_engine('postgresql://your_username:your_password@localhost:5432/vkinder_db')

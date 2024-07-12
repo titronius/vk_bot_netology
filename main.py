@@ -2,6 +2,8 @@ from random import randrange
 
 import settings
 import json
+# from models import User
+from vk_interection import VKSession,VkUser
 import vk_api
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 # from vk_api.longpoll import VkLongPoll, VkEventType
@@ -9,15 +11,28 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.utils import get_random_id
 
 
-vk_session = vk_api.VkApi(token=settings.bot_token)
+vk_session = vk_api.VkApi(token = settings.bot_token)
 vk = vk_session.get_api()
 longpoll = VkBotLongPoll(vk_session, group_id=226538050)
 
-CALLBACK_TYPES = ('show_snackbar', 'open_link', 'open_app')
+vk_group_session = VKSession(settings.bot_token)
+vk_user_session = VKSession(settings.bot_token)
 
+
+CALLBACK_TYPES = ('show_snackbar', 'open_link', 'open_app')
+# функции
+def add_user_to_db(vk_id):
+    user = VkUser(vk_user_session, vk_id)
+    user_info = user.get_user_info()
+    print(f"User Info: {user_info}")
+
+#Обработчки сообщений
 for event in longpoll.listen():
-    print(event)
+
     if event.type == VkBotEventType.MESSAGE_NEW:
+    # check_user = User.check_exist(event.object.message['from_id'])
+    # if not check_user:
+    # add_user_to_db(event.object.message['from_id'])
         if event.object.message['text'] != "":
             request = event.object.message['text']
 
@@ -48,6 +63,8 @@ for event in longpoll.listen():
             elif request == settings.buttons_for_bot[1]:
                 # Вывести список избранных людей.
                 pass
+
+
     elif event.type == VkBotEventType.MESSAGE_EDIT:
 
         if event.object.payload.get('type') in CALLBACK_TYPES:
