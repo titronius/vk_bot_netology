@@ -1,60 +1,74 @@
 import sqlalchemy as sq
 import settings
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, TIMESTAMP, Date, CHAR
+# from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, TIMESTAMP, Date, CHAR
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-import datetime
+import json
 
 Base = declarative_base()
 
 class User(Base):
     __tablename__ = 'user'
-    id = Column(Integer, primary_key=True)
-    vk_id = Column(Integer, unique=True, nullable=False)
-    first_name = Column(String(50))
-    last_name = Column(String(50))
-    profile_url = Column(Text)
-    city = Column(String(50))
-    age = Column(Integer)
-    gender = Column(CHAR(1))
-    bdate = Column(Date)
-    relation = Column(String(50))
-    smoking = Column(String(50))
-    alcohol = Column(String(50))
-    date_added = Column(TIMESTAMP, default=datetime.datetime.utcnow)
 
-    photos = relationship("Photo", back_populates="user")
-    relationships = relationship("Relationship", foreign_keys="[Relationship.user_id]")
-    related_relationships = relationship("Relationship", foreign_keys="[Relationship.related_id]")
+    id = sq.Column(sq.Integer, primary_key=True)
+    vk_id = sq.Column(sq.Integer, unique=True, nullable=False)
 
-class Photo(Base):
-    __tablename__ = 'photo'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    photo_url = Column(Text)
-    photo_vk_id = Column(Integer)
-    likes = Column(Integer)
+    def user_add(vk_id):
+        user = User(vk_id = vk_id)
+        session = BdInstruments.get_session()
+        session.add(user)
+        session.flush()
+        session.commit()
+        return user.id
 
-    user = relationship("User", back_populates="photos")
+    def user_check(vk_id):
+        session = BdInstruments.get_session()
+        q = session.query(User).filter(User.vk_id == vk_id)
+        if q.one_or_none():
+            return q.one_or_none()
+        else:
+            return False
+    
+    def user_get(user_id):
+        session = BdInstruments.get_session()
+        q = session.query(User).filter(User.id == user_id)
+        if q.one_or_none():
+            return q.one_or_none()
+        else:
+            return False
+
 
 class RelationshipStatus(Base):
     __tablename__ = 'relationship_status'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
-
-    relationships = relationship("Relationship", back_populates="status")
+    id = sq.Column(sq.Integer, primary_key=True)
+    name = sq.Column(sq.String(length=50), unique=True, nullable=False)
+    
 
 class Relationship(Base):
     __tablename__ = 'relationship'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    related_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    status_id = Column(Integer, ForeignKey('relationship_status.id'), nullable=False)
-    date_added = Column(TIMESTAMP, default=datetime.datetime.utcnow)
+    id = sq.Column(sq.Integer, primary_key=True)
+    user_id = sq.Column(sq.Integer, sq.ForeignKey('user.id'), nullable=False)
+    related_id = sq.Column(sq.Integer, sq.ForeignKey('user.id'), nullable=False)
+    status_id = sq.Column(sq.Integer, sq.ForeignKey('relationship_status.id'), nullable=False)
 
-    user = relationship("User", foreign_keys=[user_id], back_populates="relationships")
-    related_user = relationship("User", foreign_keys=[related_id], back_populates="related_relationships")
-    status = relationship("RelationshipStatus", back_populates="relationships")
+    user = relationship(User, foreign_keys=[user_id], backref='relationship_user')
+    related_user = relationship(User, foreign_keys=[related_id], backref='relationship_users')
+    status = relationship(RelationshipStatus, backref='relationship_status')
+
+    def get_users(vk_id, status_id):
+        session = BdInstruments.get_session()
+        q = session.query(Relationship).filter(Relationship.user_id == vk_id, Relationship.status_id == status_id).first()
+        if q:
+            return q.related_id
+        else:
+            return False
+        
+    def relationship_add(user_id, related_id, status_id):
+        session = BdInstruments.get_session()
+        relationship = Relationship(user_id = user_id, related_id = related_id, status_id = status_id)
+        session.add(relationship)
+        session.commit()
+
 
 class BdInstruments():
     engine = sq.create_engine(settings.DSN, pool_size=40, max_overflow=0)
@@ -69,25 +83,14 @@ class BdInstruments():
     def drop_tables():
         Base.metadata.drop_all(BdInstruments.engine)
 
-    # def data_add():
-    #     session = BdInstruments.get_session()
-    #     with open('/var/bots/education_en_ru_bot/data_for_bd/data.json', 'r') as fd:
-    #         data = json.load(fd)
+    def data_add():
+        session = BdInstruments.get_session()
+        with open('/var/bots/vk_bot_netology/data_for_bd/data.json', 'r') as fd:
+            data = json.load(fd)
 
-    #     for record in data:
-    #         model = {
-    #             'vocabulary': Vocabulary,
-    #             'category_name': CategoryName,
-    #             'status_name': StatusName
-    #         }[record.get('model')]
-    #         session.add(model(**record.get('fields')))
-    #     session.commit()
-
-
-# Подключение к базе данных
-engine = create_engine('postgresql://your_username:your_password@localhost:5432/vkinder_db')
-Base.metadata.create_all(engine)
-
-# Создание сессии для взаимодействия с БД
-Session = sessionmaker(bind=engine)
-session = Session()
+        for record in data:
+            model = {
+                'relationship_status': RelationshipStatus
+            }[record.get('model')]
+            session.add(model(**record.get('fields')))
+        session.commit()

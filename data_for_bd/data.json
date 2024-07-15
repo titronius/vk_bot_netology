@@ -1,0 +1,29 @@
+[{
+        "model": "relationship_status",
+        "fields": {
+            "id": 1,
+            "name": "new"
+        }
+    },
+    {
+        "model": "relationship_status",
+        "fields": {
+            "id": 2,
+            "name": "skipped"
+        }
+    },
+    {
+        "model": "relationship_status",
+        "fields": {
+            "id": 3,
+            "name": "favourite"
+        }
+    },
+    {
+        "model": "relationship_status",
+        "fields": {
+            "id": 4,
+            "name": "blacklist"
+        }
+    }
+]

@@ -1,6 +1,5 @@
+from datetime import datetime
 import vk_api
-# from dotenv import load_dotenv
-from pathlib import Path
 
 class VKSession:
     def __init__(self, token):
@@ -10,31 +9,27 @@ class VKSession:
         Args:
             token_name (str): Название переменной окружения, содержащей токен VK API.
         """
-        self.token = token
-        self.vk_session = vk_api.VkApi(token=self.token)
+        self.vk_session = vk_api.VkApi(token=token)
         self.vk = self.vk_session.get_api()
-    
-    # def _get_token(self, token_name):
-    #     """
-    #     Получение токена из переменных окружения.
 
-    #     Args:
-    #         token_name (str): Название переменной окружения, содержащей токен VK API.
+    def get_city_id(self, city_name, country_id=1):
+        """
+        Получение ID города по его названию.
 
-    #     Returns:
-    #         str: Токен VK API.
+        Args:
+            city_name (str): Название города.
+            country_id (int, optional): ID страны. По умолчанию 1 (Россия).
+
+        Returns:
+            int: ID города.
         
-    #     Raises:
-    #         ValueError: Если токен не найден в переменных окружения.
-    #     """
-    #     env_path = Path('.').joinpath('.env')
-    #     env_text = Path(env_path).read_text()
-
-    #     for line in env_text.splitlines():
-    #         if line.startswith(token_name):
-    #             return line.split('=')[1].strip()
-        
-    #     raise ValueError(f"{token_name} не задан в переменных окружения")
+        Raises:
+            ValueError: Если город не найден.
+        """
+        cities = self.vk.database.getCities(country_id=country_id, q=city_name, need_all=1, count=1)['items']
+        if not cities:
+            raise ValueError(f"Город {city_name} не найден")
+        return cities[0]['id']
 
     def get_user_info(self, user_id):
         """
@@ -46,7 +41,7 @@ class VKSession:
         Returns:
             dict: Информация о пользователе VK.
         """
-        user_info = self.vk.users.get(user_ids=user_id, fields='bdate, sex, city, status, relation, relation_partner, contacts, games, interests, movies, music, occupation, online, personal, schools, universities, verified')[0]
+        user_info = self.vk.users.get(user_ids=user_id, fields='bdate, sex, city, status, relation, contacts, games, interests, movies, music, occupation, online, personal, schools, universities, verified')[0]
         return user_info
     
     def get_top_photos(self, user_id, count=3):
@@ -74,6 +69,95 @@ class VKSession:
                 break
 
         return top_photos
+    
+    def search_users(self, params):
+        """
+        Поиск пользователей VK по заданным параметрам.
+
+        Args:
+            params (dict): Словарь с параметрами поиска:
+                - sex (int): Пол (1 — женщина, 2 — мужчина, 0 — любой).
+                - city (str): Название города.
+                - relation (int): Семейное положение пользователя.
+                - smoking (int): Отношение к курению (1 — да, 2 — время от времени, 3 — нет).
+                - alcohol (int): Отношение к алкоголю (1 — регулярно, 2 — иногда, 3 — никогда).
+
+        Returns:
+            list: Список ID пользователей, удовлетворяющих заданным параметрам.
+        """
+        # city_name = params.get('city', '')
+        # city_id = self.get_city_id(city_name) if city_name else 0
+
+        search_params = {
+            'sex': params.get('sex', 0),
+            'city': params.get('city'),
+            'relation': params.get('relation', 0),
+            'count': 1000,  # Максимальное количество пользователей для поиска
+            'age_from': params.get('age'),
+            'age_from': params.get('age'),
+            'fields': 'bdate, sex, city, relation, personal'
+        }
+        print(search_params)
+        users_found = self.vk.users.search(**search_params)['items']
+        user_ids = [user['id'] for user in users_found]
+        return user_ids
+    
+
+    def get_users_db_data(self, params):
+        """
+        Получение данных пользователей VK в формате для базы данных.
+
+        Args:
+            params (dict): Словарь с параметрами поиска:
+                - sex (int): Пол (1 — женщина, 2 — мужчина, 0 — любой).
+                - city (str): Название города.
+                - relation (int): Семейное положение пользователя.
+                - smoking (int): Отношение к курению (1 — да, 2 — время от времени, 3 — нет).
+                - alcohol (int): Отношение к алкоголю (1 — регулярно, 2 — иногда, 3 — никогда).
+
+        Returns:
+            list: Список словарей с данными пользователей для базы данных.
+        """
+        # Получаем список ID пользователей, удовлетворяющих параметрам поиска
+        user_ids = self.search_users(params)[:10]
+
+        # Подготовим список для хранения данных пользователей для базы данных
+        users_db_data = []
+
+        for user_id in user_ids:
+            # Получаем подробную информацию о пользователе
+            user_info = self.get_user_info(user_id)
+
+            # Проверяем корректность поля bdate
+            bdate_str = user_info.get('bdate', '01.01.1900')
+            if bdate_str == '01.01.1900':
+                bdate_parsed = datetime.strptime(bdate_str, '%d.%m.%Y').date()
+            else:
+                try:
+                    if '.' in bdate_str:
+                        bdate_parsed = datetime.strptime(bdate_str, '%d.%m.%Y').date()
+                    else:
+                        bdate_parsed = datetime.strptime(bdate_str, '%d.%m').date()
+                except (ValueError, TypeError):
+                    bdate_parsed = datetime.strptime('01.01.1900', '%d.%m.%Y').date()
+
+            # Формируем словарь с данными пользователя для базы данных
+            user_dict = {
+                'id': user_info['id'],
+                'first_name': user_info['first_name'],
+                'last_name': user_info['last_name'],
+                'bdate': bdate_parsed,
+                'sex': user_info.get('sex', None),
+                'city': user_info.get('city', {}).get('title', ''),
+                'relation': user_info.get('relation', None),
+                'smoking': params.get('smoking', None),
+                'alcohol': params.get('alcohol', None)
+            }
+
+            users_db_data.append(user_dict)
+
+        return users_db_data
+
 
 class VkUser:
     def __init__(self, vk_user_session, user_id):
@@ -110,14 +194,11 @@ class VkUser:
 
 
 if __name__ == "__main__":
-    # Загрузка переменных окружения из файла .env
-    # load_dotenv(dotenv_path=Path('.').joinpath('.env'))
-
     # Инициализация сессий VK API для группы и пользователя
     vk_group_session = VKSession('VK_GROUP_TOKEN')
     vk_user_session = VKSession('VK_USER_TOKEN')
 
-    user_id = 5883760
+    user_id = 331709599
 
     # Создание объекта пользователя и получение информации о нем
     user = VkUser(vk_user_session, user_id)
@@ -127,3 +208,24 @@ if __name__ == "__main__":
     # Получение топовых фотографий пользователя
     top_photos = user.get_top_photos()
     print(f"Top Photos: {top_photos}")
+
+    # Поиск пользователей по заданным параметрам
+    search_params = {
+        'sex': 1,
+        'city': 'Оренбург',
+        'relation': 6,
+        'smoking': 0,
+        'alcohol': 0
+    }
+
+    user_ids = vk_user_session.search_users(search_params)
+    print(f"Найдено пользователей: {len(user_ids)}")
+
+    # Предположим, что у вас уже есть экземпляр класса VKSession и загружены параметры поиска search_params
+
+    # Получаем данные пользователей VK в формате для базы данных
+    users_db_data = vk_user_session.get_users_db_data(search_params)
+
+    # Выводим информацию о найденных пользователях
+    for user_data in users_db_data:
+        print(user_data)
