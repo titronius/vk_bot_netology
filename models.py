@@ -68,6 +68,12 @@ class Relationship(Base):
         relationship = Relationship(user_id = user_id, related_id = related_id, status_id = status_id)
         session.add(relationship)
         session.commit()
+        
+    def status_set(user_vk_id, related_id, status_id):
+        session = BdInstruments.get_session()
+        user_id = User.user_check(user_vk_id).id
+        session.query(Relationship).filter(Relationship.user_id == user_id,Relationship.related_id == related_id,).update({"status_id": status_id})
+        session.commit()
 
 
 class BdInstruments():

@@ -1,4 +1,4 @@
-from random import randrange
+import random
 from datetime import datetime
 
 import settings
@@ -22,29 +22,61 @@ vk_user_session = VKSession(settings.user_token)
 CALLBACK_TYPES = ('show_snackbar', 'open_link', 'open_app')
 
 def send_profile(vk_id, profile_id):
-    profile_vk_id = User.user_get(1).vk_id
+    profile_vk_id = User.user_get(profile_id).vk_id
     profile = VkUser(vk_user_session, profile_vk_id)
     profile_info = profile.get_user_info()
+    if profile_info['is_closed']:
+        Relationship.status_set(vk_id, profile_id, 2)
+        user_to_show_id = get_profiles(vk_id, 1)
+        send_profile(vk_id, user_to_show_id)
+    else:
+        msg = f"{profile_info['first_name']} {profile_info['last_name']}"
+        link = f'https://vk.com/id{profile_vk_id}'
+        attachment = ','.join(profile.get_top_photos())
 
-    # получить из бд юзеров по информации о пользователе
-    # - имя и фамилия,
-    # - ссылка на профиль,
-    # - три фотографии в виде attachment(https://dev.vk.com/method/messages.send).
-    msg = f"{profile_info['first_name']} {profile_info['last_name']}"
-    link = f'https://vk.com/id{profile_vk_id}'
-    attachment = "photo12908812_457240175,photo12908812_457240168"
-    top_photos = profile.get_top_photos()
-    print(f"Top Photos: {top_photos}")
-    # user_id = 123131
-    # keyboard = VkKeyboard(inline = True)
-    # keyboard.add_openlink_button(label = '🔗 Ссылка на профиль', link = link)
-    # keyboard.add_line()
-    # keyboard.add_callback_button(label = '❤️ Добавить в избранное', color=VkKeyboardColor.SECONDARY, payload = {"type": f"add_to_favorite:{user_id}"})
-    # keyboard.add_callback_button(label = '❌ Добавить в чс', color=VkKeyboardColor.SECONDARY, payload = {f"type": f"add_to_blacklist:{user_id}"})
-    # keyboard.add_line()
-    # keyboard.add_callback_button(label = '➡️ Следующий', color=VkKeyboardColor.SECONDARY, payload = {f"type": f"next_people:{user_id}"})
+        keyboard = VkKeyboard(inline = True)
+        keyboard.add_openlink_button(label = '🔗 Ссылка на профиль', link = link)
+        keyboard.add_line()
+        keyboard.add_callback_button(label = '❤️ Добавить в избранное', color=VkKeyboardColor.SECONDARY, payload = {"type": f"add_to_favorite:{profile_id}"})
+        keyboard.add_callback_button(label = '❌ Добавить в чс', color=VkKeyboardColor.SECONDARY, payload = {f"type": f"add_to_blacklist:{profile_id}"})
+        keyboard.add_line()
+        keyboard.add_callback_button(label = '➡️ Следующий', color=VkKeyboardColor.SECONDARY, payload = {f"type": f"next_people:{profile_id}"})
+        
+        vk.messages.send(user_id = vk_id, random_id = get_random_id(), keyboard = keyboard.get_keyboard(), message = msg, attachment = attachment)
     
-    # vk.messages.send(user_id = event.object.message['from_id'], random_id = get_random_id(), keyboard = keyboard.get_keyboard(), message = msg, attachment = attachment)
+def get_profiles(vk_id, status_id):
+    user_bd = User.user_check(vk_id)
+    user_to_show_id = Relationship.get_users(user_bd.id, status_id)
+    if not user_to_show_id:
+        user = VkUser(vk_group_session, vk_id)
+        user_info = user.get_user_info()
+        print(user_info)
+        try:
+            birthdate = datetime.strptime(user_info['bdate'], "%d.%m.%Y")
+            age = datetime.now().year - birthdate.year - ((datetime.now().month, datetime.now().day) < (birthdate.month, birthdate.day))
+        except:
+            age = random.randint(18, 45)
+
+        search_params = {
+            'sex': 1 if user_info['sex'] == 2 else 2,
+            'city': user_info['city']['id'],
+            'age': age
+        }
+        
+        user_ids = vk_user_session.search_users(search_params)
+        msg = f"Подбираем подходящих пользователей..."
+        vk.messages.send(user_id = vk_id, random_id = get_random_id(), message = msg)
+        
+        for user_id in user_ids:
+            check_user = User.user_check(user_id)
+            if not check_user:
+                related_id = User.user_add(user_id)
+                Relationship.relationship_add(user_bd.id, related_id, 1)
+        
+        msg = f"Найдено {len(user_ids)} пользователей"
+        vk.messages.send(user_id = vk_id, random_id = get_random_id(), message = msg)
+        user_to_show_id = Relationship.get_users(user_bd.id, 1)
+    return user_to_show_id
 
 
 #Обработчки сообщений
@@ -71,35 +103,7 @@ for event in longpoll.listen():
                 vk.messages.send(user_id = event.object.message['from_id'], random_id = get_random_id(), keyboard = keyboard.get_keyboard(), message = settings.greeting_msg)
             
             elif request == settings.buttons_for_bot[0]:
-                user_bd = User.user_check(event.object.message['from_id'])
-                user_to_show_id = Relationship.get_users(user_bd.id, 1)
-                if not user_to_show_id:
-                    user = VkUser(vk_group_session, event.object.message['from_id'])
-                    user_info = user.get_user_info()
-                    print(user_info)
-                    birthdate = datetime.strptime(user_info['bdate'], "%d.%m.%Y")
-                    age = datetime.now().year - birthdate.year - ((datetime.now().month, datetime.now().day) < (birthdate.month, birthdate.day))
-
-                    search_params = {
-                        'sex': 1 if user_info['sex'] == 2 else 1,
-                        'city': user_info['city']['id'],
-                        'age': age
-                    }
-                    
-                    user_ids = vk_user_session.search_users(search_params)
-                    msg = f"Подбираем подходящих пользователей..."
-                    vk.messages.send(user_id = event.object.message['from_id'], random_id = get_random_id(), message = msg)
-                    
-                    for user_id in user_ids:
-                        check_user = User.user_check(user_id)
-                        if not check_user:
-                            related_id = User.user_add(user_id)
-                            Relationship.relationship_add(user_bd.id, related_id, 1)
-                    
-                    msg = f"Найдено {len(user_ids)} пользователей"
-                    vk.messages.send(user_id = event.object.message['from_id'], random_id = get_random_id(), message = msg)
-                    user_to_show_id = Relationship.get_users(user_bd.id, 1)
-
+                user_to_show_id = get_profiles(event.object.message['from_id'], 1)
                 send_profile(event.object.message['from_id'], user_to_show_id)
  
             elif request == settings.buttons_for_bot[1]:
@@ -123,10 +127,17 @@ for event in longpoll.listen():
     elif event.type == VkBotEventType.MESSAGE_EVENT:
 
         if event.object.payload.get('type') not in CALLBACK_TYPES:
-            # Удалить предыдущее сообщение
-            vk.messages.delete(message_ids = event.object['conversation_message_id'], peer_id = event.object['user_id'], delete_for_all = 1)
-            # Отослать нового пользователя
-            vk.messages.send(user_id = event.object['user_id'], random_id = get_random_id(), message = event.object.payload.get('type'))
-        else:
-            print('хуяк')
+            act, data = event.object.payload.get('type').split(':')
+            if act == 'next_people':
+                status_id = 2
+            elif act == 'add_to_favorite':
+                status_id = 3
+                vk.messages.send(user_id = event.object['user_id'], random_id = get_random_id(), message = '❤️ Пользователь добавлен в список избранных.\nПоказываем следующего...')
+            elif act == 'add_to_blacklist':
+                status_id = 4
+                vk.messages.send(user_id = event.object['user_id'], random_id = get_random_id(), message = '👎🏻 Пользователь добавлен в ЧС.\nПоказываем следующего...')
+            Relationship.status_set(event.object['user_id'], data, status_id)
+            vk.messages.delete(peer_id = event.object['user_id'], delete_for_all = 1, cmids = event.object['conversation_message_id'])
+            user_to_show_id = get_profiles(event.object['user_id'], 1)
+            send_profile(event.object['user_id'], user_to_show_id)
             

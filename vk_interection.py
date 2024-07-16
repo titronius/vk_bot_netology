@@ -60,10 +60,7 @@ class VKSession:
 
         top_photos = []
         for photo in sorted_photos:
-            sizes = photo['sizes']
-            largest_photo = next((size for size in sizes if size['type'] == 'w'), None)
-            if largest_photo:
-                top_photos.append(largest_photo['url'])
+            top_photos.append(f"photo{photo['owner_id']}_{photo['id']}")
 
             if len(top_photos) >= count:
                 break
@@ -191,41 +188,3 @@ class VkUser:
             list: Список URL топовых фотографий.
         """
         return self.vk_user_session.get_top_photos(self.user_id, count)
-
-
-if __name__ == "__main__":
-    # Инициализация сессий VK API для группы и пользователя
-    vk_group_session = VKSession('VK_GROUP_TOKEN')
-    vk_user_session = VKSession('VK_USER_TOKEN')
-
-    user_id = 331709599
-
-    # Создание объекта пользователя и получение информации о нем
-    user = VkUser(vk_user_session, user_id)
-    user_info = user.get_user_info()
-    print(f"User Info: {user_info}")
-
-    # Получение топовых фотографий пользователя
-    top_photos = user.get_top_photos()
-    print(f"Top Photos: {top_photos}")
-
-    # Поиск пользователей по заданным параметрам
-    search_params = {
-        'sex': 1,
-        'city': 'Оренбург',
-        'relation': 6,
-        'smoking': 0,
-        'alcohol': 0
-    }
-
-    user_ids = vk_user_session.search_users(search_params)
-    print(f"Найдено пользователей: {len(user_ids)}")
-
-    # Предположим, что у вас уже есть экземпляр класса VKSession и загружены параметры поиска search_params
-
-    # Получаем данные пользователей VK в формате для базы данных
-    users_db_data = vk_user_session.get_users_db_data(search_params)
-
-    # Выводим информацию о найденных пользователях
-    for user_data in users_db_data:
-        print(user_data)
