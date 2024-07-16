@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 /myenv
 /.venv
 /__pycache__
 .env
 *_old.py
+=======
+.idea/
+>>>>>>> a3db3e38e38238f0d04f3e01910199b868b6e553

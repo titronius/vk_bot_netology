@@ -1,46 +1,16 @@
 from datetime import datetime
-from pprint import pprint
-from sqlalchemy import create_engine, Column, Integer, String, Date, SmallInteger, ForeignKey, UniqueConstraint, TIMESTAMP
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
 import vk_api
-from dotenv import load_dotenv
-from pathlib import Path
 
 class VKSession:
-    def __init__(self, token_name):
+    def __init__(self, token):
         """
         Инициализация сессии VK API.
 
         Args:
             token_name (str): Название переменной окружения, содержащей токен VK API.
         """
-        self.token = self._get_token(token_name)
-        self.vk_session = vk_api.VkApi(token=self.token)
+        self.vk_session = vk_api.VkApi(token=token)
         self.vk = self.vk_session.get_api()
-    
-    def _get_token(self, token_name):
-        """
-        Получение токена из переменных окружения.
-
-        Args:
-            token_name (str): Название переменной окружения, содержащей токен VK API.
-
-        Returns:
-            str: Токен VK API.
-        
-        Raises:
-            ValueError: Если токен не найден в переменных окружения.
-        """
-        env_path = Path('.').joinpath('.env')
-        env_text = Path(env_path).read_text()
-
-        for line in env_text.splitlines():
-            if line.startswith(token_name):
-                return line.split('=')[1].strip()
-        
-        raise ValueError(f"{token_name} не задан в переменных окружения")
-    
 
     def get_city_id(self, city_name, country_id=1):
         """
@@ -90,10 +60,7 @@ class VKSession:
 
         top_photos = []
         for photo in sorted_photos:
-            sizes = photo['sizes']
-            largest_photo = next((size for size in sizes if size['type'] == 'w'), None)
-            if largest_photo:
-                top_photos.append(largest_photo['url'])
+            top_photos.append(f"photo{photo['owner_id']}_{photo['id']}")
 
             if len(top_photos) >= count:
                 break
@@ -115,17 +82,19 @@ class VKSession:
         Returns:
             list: Список ID пользователей, удовлетворяющих заданным параметрам.
         """
-        city_name = params.get('city', '')
-        city_id = self.get_city_id(city_name) if city_name else 0
+        # city_name = params.get('city', '')
+        # city_id = self.get_city_id(city_name) if city_name else 0
 
         search_params = {
             'sex': params.get('sex', 0),
-            'city': city_id,
+            'city': params.get('city'),
             'relation': params.get('relation', 0),
             'count': 1000,  # Максимальное количество пользователей для поиска
+            'age_from': params.get('age'),
+            'age_from': params.get('age'),
             'fields': 'bdate, sex, city, relation, personal'
         }
-        print(search_params)
+
         users_found = self.vk.users.search(**search_params)['items']
         user_ids = [user['id'] for user in users_found]
         return user_ids
@@ -187,7 +156,7 @@ class VKSession:
         return users_db_data
 
 
-class User:
+class VkUser:
     def __init__(self, vk_user_session, user_id):
         """
         Инициализация объекта пользователя VK.
@@ -219,45 +188,3 @@ class User:
             list: Список URL топовых фотографий.
         """
         return self.vk_user_session.get_top_photos(self.user_id, count)
-
-
-if __name__ == "__main__":
-    # Загрузка переменных окружения из файла .env
-    load_dotenv(dotenv_path=Path('.').joinpath('.env'))
-
-    # Инициализация сессий VK API для группы и пользователя
-    vk_group_session = VKSession('VK_GROUP_TOKEN')
-    vk_user_session = VKSession('VK_USER_TOKEN')
-
-    user_id = 331709599
-
-    # Создание объекта пользователя и получение информации о нем
-    user = User(vk_user_session, user_id)
-    user_info = user.get_user_info()
-    print(f"User Info: {user_info}")
-
-    # Получение топовых фотографий пользователя
-    top_photos = user.get_top_photos()
-    print(f"Top Photos: {top_photos}")
-
-    # Поиск пользователей по заданным параметрам
-    search_params = {
-        'sex': 1,
-        'city': 'Оренбург',
-        'relation': 6,
-        'smoking': 0,
-        'alcohol': 0
-    }
-
-    user_ids = vk_user_session.search_users(search_params)
-    print(f"Найдено пользователей: {len(user_ids)}")
-    pprint(f"ID пользователей: {user_ids}")
-
-    # Предположим, что у вас уже есть экземпляр класса VKSession и загружены параметры поиска search_params
-
-    # Получаем данные пользователей VK в формате для базы данных
-    users_db_data = vk_user_session.get_users_db_data(search_params)
-
-    # Выводим информацию о найденных пользователях
-    for user_data in users_db_data:
-        print(user_data)
