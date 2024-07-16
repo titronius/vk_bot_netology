@@ -57,10 +57,20 @@ class Relationship(Base):
 
     def get_users(vk_id, status_id):
         session = BdInstruments.get_session()
-        q = session.query(Relationship).filter(Relationship.user_id == vk_id, Relationship.status_id == status_id).first()
-        if q:
-            return q.related_id
+        if status_id in [3,4]:
+            q = session.query(Relationship)\
+                .join(User, User.id == Relationship.related_id)\
+                .filter(Relationship.user_id == vk_id, Relationship.status_id == status_id)
+            if q:
+                users = []
+                for user in q.all():
+                    users.append(user.related_user.vk_id)
+                return users
         else:
+            q = session.query(Relationship).filter(Relationship.user_id == vk_id, Relationship.status_id == status_id).first()
+            if q:
+                return q.related_id
+        if not q:
             return False
         
     def relationship_add(user_id, related_id, status_id):

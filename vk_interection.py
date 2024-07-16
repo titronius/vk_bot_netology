@@ -94,7 +94,7 @@ class VKSession:
             'age_from': params.get('age'),
             'fields': 'bdate, sex, city, relation, personal'
         }
-        print(search_params)
+
         users_found = self.vk.users.search(**search_params)['items']
         user_ids = [user['id'] for user in users_found]
         return user_ids
