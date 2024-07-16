@@ -91,7 +91,7 @@ class VKSession:
             'relation': params.get('relation', 0),
             'count': 1000,  # Максимальное количество пользователей для поиска
             'age_from': params.get('age'),
-            'age_from': params.get('age'),
+            'age_to': params.get('age'),
             'fields': 'bdate, sex, city, relation, personal'
         }
 
